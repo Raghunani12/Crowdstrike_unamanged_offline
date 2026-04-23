@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CS Unmanaged Asset Classifier v4</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/static/styles.css">
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="hdr">
+  <div class="hdr-logo">
+    <div class="hex-mark">
+      <svg viewBox="0 0 40 40" fill="none">
+        <polygon points="20,2 38,11 38,29 20,38 2,29 2,11" fill="none" stroke="var(--n5)" stroke-width="1.5"/>
+        <polygon points="20,8 32,14.5 32,25.5 20,32 8,25.5 8,14.5" fill="none" stroke="var(--b3)" stroke-width=".8"/>
+        <circle cx="20" cy="20" r="4" fill="var(--n5)"/>
+        <line x1="20" y1="8" x2="20" y2="14" stroke="var(--n5)" stroke-width=".8" opacity=".5"/>
+        <line x1="20" y1="26" x2="20" y2="32" stroke="var(--n5)" stroke-width=".8" opacity=".5"/>
+        <line x1="8" y1="14.5" x2="13" y2="17.5" stroke="var(--n5)" stroke-width=".8" opacity=".5"/>
+        <line x1="27" y1="22.5" x2="32" y2="25.5" stroke="var(--n5)" stroke-width=".8" opacity=".5"/>
+        <line x1="8" y1="25.5" x2="13" y2="22.5" stroke="var(--n5)" stroke-width=".8" opacity=".5"/>
+        <line x1="27" y1="17.5" x2="32" y2="14.5" stroke="var(--n5)" stroke-width=".8" opacity=".5"/>
+      </svg>
+    </div>
+    <div class="brand">
+      <h1>Unmanaged Asset <span>Classifier</span></h1>
+      <p>CrowdStrike Discovery · DNS Verification · v4.1</p>
+    </div>
+  </div>
+  <div class="hdr-actions">
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-val" id="kTotal" style="color:var(--text)">—</div><div class="kpi-lbl">Total</div></div>
+      <div class="kpi"><div class="kpi-val" id="kNoise" style="color:var(--n0)">—</div><div class="kpi-lbl">Noise</div></div>
+      <div class="kpi"><div class="kpi-val" id="kAction" style="color:var(--n5)">—</div><div class="kpi-lbl">Action</div></div>
+      <div class="kpi"><div class="kpi-val" id="kSuppress" style="color:var(--svc)">—</div><div class="kpi-lbl">Suppress</div></div>
+    </div>
+    <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+    <button class="strict-btn" id="strictDnsBtn" title="Strict_Host_name_DNS">Strict_Host_name_DNS: OFF</button>
+  </div>
+</header>
+
+<div class="dz" id="dz">
+  <span class="dz-ico">◈</span>
+  <div class="dz-t">Drop CrowdStrike Unmanaged Asset Export</div>
+  <div class="dz-s">
+    <code>.xlsx</code> · <code>.xls</code> · <code>.csv</code> &nbsp;·&nbsp; Processed locally · DNS verified via system resolver<br/>
+    Columns: <code>Discovered asset name</code> · <code>First seen</code> · <code>Last seen</code> · <code>Seen by (count)</code> · <code>MAC address</code> · <code>OS version</code> · <code>Manufacturer</code> · <code>Organizational unit</code> · <code>Confidence</code>
+  </div>
+  <button class="dz-btn" onclick="document.getElementById('fi').click()">Browse File</button>
+  <input type="file" id="fi" accept=".xlsx,.xls,.csv"/>
+</div>
+
+<div class="charts-section" id="chartsSection">
+  <div class="chart-card">
+    <h3>Class Distribution</h3>
+    <div class="donut-wrap">
+      <canvas id="donutChart"></canvas>
+      <div class="donut-center"><div class="dc-val" id="donutTotal">0</div><div class="dc-lbl">Assets</div></div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <h3>Score Distribution</h3>
+    <div class="chart-wrap"><canvas id="scoreChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <h3>Platform Breakdown</h3>
+    <div class="chart-wrap"><canvas id="platformChart"></canvas></div>
+  </div>
+</div>
+
+<!-- LEGEND with DNS buttons -->
+<div class="legend" id="legend">
+  <div class="lc lc-n0" data-cls="ALL"><div class="lc-cls">All</div><div class="lc-name">All</div><div class="lc-count" id="c-all">0</div><div class="lc-pct" id="p-all"></div><div class="lc-desc">All assets.</div><button class="lc-dns-btn" data-cls="ALL">⌕ Verify DNS</button></div>
+  <div class="lc lc-n0" data-cls="N0"><div class="lc-cls">N0</div><div class="lc-name">Noise</div><div class="lc-count" id="c-N0">0</div><div class="lc-pct" id="p-N0">—</div><div class="lc-desc">Score &lt;25, &lt;1h. Artifact.</div><button class="lc-dns-btn" data-cls="N0">⌕ Verify DNS</button></div>
+  <div class="lc lc-n1" data-cls="N1"><div class="lc-cls">N1</div><div class="lc-name">Ghost</div><div class="lc-count" id="c-N1">0</div><div class="lc-pct" id="p-N1">—</div><div class="lc-desc">Score &lt;25, ≥1h, idle.</div><button class="lc-dns-btn" data-cls="N1">⌕ Verify DNS</button></div>
+  <div class="lc lc-n2" data-cls="N2"><div class="lc-cls">N2</div><div class="lc-name">Transient</div><div class="lc-count" id="c-N2">0</div><div class="lc-pct" id="p-N2">—</div><div class="lc-desc">Score 25–54, &lt;24h.</div><button class="lc-dns-btn" data-cls="N2">⌕ Verify DNS</button></div>
+  <div class="lc lc-n3" data-cls="N3"><div class="lc-cls">N3</div><div class="lc-name">Candidate</div><div class="lc-count" id="c-N3">0</div><div class="lc-pct" id="p-N3">—</div><div class="lc-desc">Score 25–54, ≥24h.</div><button class="lc-dns-btn" data-cls="N3">⌕ Verify DNS</button></div>
+  <div class="lc lc-n4" data-cls="N4"><div class="lc-cls">N4</div><div class="lc-name">Unmanaged</div><div class="lc-count" id="c-N4">0</div><div class="lc-pct" id="p-N4">—</div><div class="lc-desc">Score 55–89, ≥24h.</div><button class="lc-dns-btn" data-cls="N4">⌕ Verify DNS</button></div>
+  <div class="lc lc-n5" data-cls="N5"><div class="lc-cls">N5</div><div class="lc-name">Active Rogue</div><div class="lc-count" id="c-N5">0</div><div class="lc-pct" id="p-N5">—</div><div class="lc-desc">Score ≥90, ≥24h.</div><button class="lc-dns-btn" data-cls="N5">⌕ Verify DNS</button></div>
+  <div class="lc lc-svc" data-cls="SVC"><div class="lc-cls">SVC</div><div class="lc-name">Svc Account</div><div class="lc-count" id="c-SVC">0</div><div class="lc-pct" id="p-SVC">—</div><div class="lc-desc">MSA. Not a device.</div><button class="lc-dns-btn" data-cls="SVC">⌕ Verify DNS</button></div>
+  <div class="lc lc-scn" data-cls="SCANNER"><div class="lc-cls">SCN</div><div class="lc-name">Scanner</div><div class="lc-count" id="c-SCANNER">0</div><div class="lc-pct" id="p-SCANNER">—</div><div class="lc-desc">Known security tool.</div><button class="lc-dns-btn" data-cls="SCANNER">⌕ Verify DNS</button></div>
+  <div class="lc lc-rev" data-cls="REVIEW"><div class="lc-cls">REV</div><div class="lc-name">Review</div><div class="lc-count" id="c-REVIEW">0</div><div class="lc-pct" id="p-REVIEW">—</div><div class="lc-desc">Edge case. Manual review.</div><button class="lc-dns-btn" data-cls="REVIEW">⌕ Verify DNS</button></div>
+</div>
+
+<!-- DNS RESULTS PANEL -->
+<div class="dns-panel" id="dnsPanel">
+  <div class="dns-panel-hdr">
+    <h3 id="dnsPanelTitle">DNS Verification <span id="dnsPanelClass"></span></h3>
+    <div class="dns-stats">
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsTotal" style="color:var(--text)">0</div><div class="dns-stat-lbl">Total</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsResolved" style="color:var(--n2)">0</div><div class="dns-stat-lbl">Resolved</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsUnresolved" style="color:var(--n5)">0</div><div class="dns-stat-lbl">Unresolved</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsTimeout" style="color:var(--n3)">0</div><div class="dns-stat-lbl">Timeout</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsDollar" style="color:var(--text2)">0</div><div class="dns-stat-lbl">Assets with $</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsDollarResolved" style="color:var(--n2)">0</div><div class="dns-stat-lbl">$ Resolved</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsDollarUnresolved" style="color:var(--n5)">0</div><div class="dns-stat-lbl">$ Unresolved</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsDollarResolved" style="color:var(--n2)">0</div><div class="dns-stat-lbl">$ Resolved</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="dnsDollarUnresolved" style="color:var(--n5)">0</div><div class="dns-stat-lbl">$ Unresolved</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="tbl-expand" data-target="dnsPanel" title="Expand DNS table">⤢</button>
+      <button class="dns-close" id="dnsClose">✕</button>
+    </div>
+  </div>
+  <div class="dns-progress"><div class="dns-progress-bar" id="dnsProgressBar"></div></div>
+  <div class="dns-actions">
+    <button class="dns-filter-btn on" data-df="ALL">All</button>
+    <button class="dns-filter-btn" data-df="resolved">Resolved</button>
+    <button class="dns-filter-btn" data-df="unresolved">Unresolved</button>
+    <button class="dns-filter-btn" data-df="timeout">Timeout</button>
+    <button class="dns-export-btn" id="dnsExportBtn">⬇ Export DNS CSV</button>
+  </div>
+  <div class="dns-table-wrap">
+    <table class="dns-table">
+      <thead><tr>
+        <th>Asset Name</th>
+        <th>Class</th>
+        <th>Score</th>
+        <th>Last Seen</th>
+        <th>Hostname Queried</th>
+        <th>Status</th>
+        <th>Resolved IP</th>
+        <th>Assets_with_$</th>
+        <th>Reverse Hostname</th>
+      </tr></thead>
+      <tbody id="dnsTbody"><tr><td colspan="9" class="dns-loading"><span class="dns-spinner"></span>Running DNS lookups…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="strict-dns-wrap" id="strictDnsWrap">
+    <h4>Strict Hostname Results (assets with trailing $) <button class="tbl-expand" data-target="strictDnsWrap" title="Expand Strict table" style="margin-left:8px">⤢</button></h4>
+    <div class="strict-dns-stats">
+      <div class="dns-stat"><div class="dns-stat-val" id="strictTotal" style="color:var(--text)">0</div><div class="dns-stat-lbl">Total</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="strictResolved" style="color:var(--n2)">0</div><div class="dns-stat-lbl">Resolved</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="strictUnresolved" style="color:var(--n5)">0</div><div class="dns-stat-lbl">Unresolved</div></div>
+      <div class="dns-stat"><div class="dns-stat-val" id="strictTimeout" style="color:var(--n3)">0</div><div class="dns-stat-lbl">Timeout</div></div>
+      <button class="dns-filter-btn on" data-sdf="ALL" id="strictFilterAll">All</button>
+      <button class="dns-filter-btn" data-sdf="resolved" id="strictFilterRes">Resolved</button>
+      <button class="dns-filter-btn" data-sdf="unresolved" id="strictFilterUnres">Unresolved</button>
+      <button class="dns-filter-btn" data-sdf="timeout" id="strictFilterTimeout">Timeout</button>
+      <button class="dns-export-btn" id="strictExportBtn">⬇ Export Strict CSV</button>
+    </div>
+    <div class="dns-table-wrap">
+      <table class="strict-dns-table">
+        <thead><tr>
+          <th>Asset Name</th>
+          <th>Class</th>
+          <th>Score</th>
+          <th>Last Seen</th>
+          <th>Hostname Queried</th>
+          <th>Status</th>
+          <th>Resolved IP</th>
+          <th>Reverse Hostname</th>
+        </tr></thead>
+        <tbody id="strictTbody"><tr><td colspan="8" class="dns-loading"><span class="dns-spinner"></span>No strict-host results yet</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="ctrl" id="ctrl">
+  <div class="srch-w"><input class="srch" id="srch" type="text" placeholder="Search name, IP, platform, manufacturer, OU…"/></div>
+  <button class="cbtn" data-f="ALL">All</button>
+  <button class="cbtn" data-f="N0">N0</button>
+  <button class="cbtn" data-f="N1">N1</button>
+  <button class="cbtn" data-f="N2">N2</button>
+  <button class="cbtn" data-f="N3">N3</button>
+  <button class="cbtn" data-f="N4">N4</button>
+  <button class="cbtn" data-f="N5">N5</button>
+  <button class="cbtn" data-f="SVC">SVC</button>
+  <button class="cbtn" data-f="SCANNER">SCN</button>
+  <button class="cbtn" data-f="REVIEW">REV</button>
+  <div class="tog" id="tog"><div class="pill"><div class="knob"></div></div>Hide noise</div>
+  <button class="expbtn" id="expbtn">⬇ Export CSV</button>
+</div>
+
+<div class="rmeta" id="rmeta">
+  <span id="rcTxt">—</span>
+  <span class="npill" id="noisePill"></span>
+</div>
+
+  <div class="tshell" id="tshell">
+    <button class="tbl-expand" data-target="tshell" title="Expand Assets table" style="position:absolute;right:10px;top:8px;z-index:5">⤢</button>
+  <div class="tscroll">
+    <table id="tbl">
+      <thead><tr>
+        <th data-col="asset_name">Asset Name <span class="arr">↕</span></th>
+        <th data-col="class">Class <span class="arr">↕</span></th>
+        <th>Priority</th>
+        <th data-col="score">Score <span class="arr">↕</span></th>
+        <th>Platform</th>
+        <th data-col="lifetime_hours">Lifetime h <span class="arr">↕</span></th>
+        <th>Life</th>
+        <th data-col="density">Density <span class="arr">↕</span></th>
+        <th>Density</th>
+        <th data-col="discoverers">Discoverers <span class="arr">↕</span></th>
+        <th>Confidence</th>
+        <th>Last Seen By</th>
+        <th>IP (last)</th>
+        <th>MAC</th>
+        <th>OS Version</th>
+        <th>Manufacturer</th>
+        <th>OU / AD</th>
+        <th>Serial</th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="18" class="empty">Upload a CrowdStrike unmanaged asset export to begin</td></tr></tbody>
+    </table>
+  </div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+
+</html>
